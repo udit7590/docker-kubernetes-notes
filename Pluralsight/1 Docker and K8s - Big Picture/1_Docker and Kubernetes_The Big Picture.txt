@@ -1,0 +1,81 @@
+Docker and Kubernetes: The Big Picture
+
+By Bigel Poulton
+
+--------------------------------------------------------------------------------------------------
+> INDEX
+--------------------------------------------------------------------------------------------------
+  > Containers Primer
+  > Docker
+  > Kubernetes
+  > Thriving in a container world
+  > Enterprise & Production Readiness
+  > Work on Orchestration
+  > What Next
+
+--------------------------------------------------------------------------------------------------
+> CONTAINERS
+--------------------------------------------------------------------------------------------------
+  > VMWare & Hypervisor
+    - Better than having a server for each application
+    - Servers reached 70-75% capacity
+    - Issues
+      : Each VM is a slice of the hardware itself
+      : Each VM also has its own OS. Each OS has its own licence. Also virtual LAN, virtual network, etc
+      : Admin Work - Updates, Patching, AV, etc
+    - Still they are relevant. Containers and VMs live side by side
+  > Containers
+    - No individual OS
+    - Each container is like a slice of OS itself
+    - Each container starts within seconds
+
+--------------------------------------------------------------------------------------------------
+> DOCKER
+--------------------------------------------------------------------------------------------------
+  > Docker, Inc is a company and Docker is the technology
+  > Docker, Inc (San Francisco)
+    - dotCLoud - Main sponsor behind the Docker
+    - They built docker internally and decided to launch it for the world
+  > Docker
+    - Docker makes running apps inside the containers really easy (Containerizing Apps)
+    - Community Edition (CE) : Open source, Lots of contributors, Quick release cycle
+    - Enterprise Edition (EE) : Slower release cycle, Additional features, Official support
+  > Steps
+    - Step 1: Containerize the app
+      docker image build -t nigelpoulton/ctr-demo:2 .
+      docker image ls nigelpoulton/ctr-demo:2
+    - Step 2: Push the image to repository/registry (eg. Docker Hub)
+      docker image push nigelpoulton/ctr-demo:2
+    - Step 3: Run the container and expose it to the network
+      docker container run -d --name web -p 8000:8080 nigelpoulton/ctr-demo:2
+
+--------------------------------------------------------------------------------------------------
+> KUBENETES
+--------------------------------------------------------------------------------------------------
+  > Opensource project from Google
+  > Now owned by Cloud Native Computing Foundation
+  > Works on clouds, on-premise, even your local laptop
+  > Short Form: k8s
+  > Docker cares about low level stuff - eg how to start | stop | delete a container
+  > K8s cares about high level stuff - echeduling, scaling (how many containers), healing, updating...
+  > K8s is decoupled from the underlying infrastructure. K8s is same on Cloud A, CLoud B, On-Premise
+
+--------------------------------------------------------------------------------------------------
+> SUITABLE WORKLOADS
+--------------------------------------------------------------------------------------------------
+  > Docker and K8s : Supports both Stateless & Stateful apps now
+    - Eg. Database is Stateful. Nodes have to store the data and need to query the data that was stored
+    - Static App is stateless. Even after weeks, the app is exactly the same and does not need to remember anything
+
+--------------------------------------------------------------------------------------------------
+> ORCHESTRATION
+--------------------------------------------------------------------------------------------------
+  > Define the app, infra architecture, services and how they interact
+  > K8s or other orchestrator makes it happen
+
+--------------------------------------------------------------------------------------------------
+> EVENTS
+--------------------------------------------------------------------------------------------------
+  - Dockercon
+  - Kubecon
+  

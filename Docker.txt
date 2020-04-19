@@ -1,0 +1,715 @@
+------------------
+DOCKER
+------------------
+Release - March 20, 2013
+Written in - Go
+Author - Solomon Hykes & Sebastien Pahl
+LXC - Ayg 6, 2008 (LXC is an operating-system-level virtualization method for running multiple isolated Linux systems on a control host using a single Linux kernel)
+------------------
+> CONCEPTS
+------------------
+  : A container is launched by running an image. An image is an executable package that includes everything needed to run an application--the code, a runtime, libraries, environment variables, and configuration files.
+  : A container is a runtime instance of an image--what the image becomes in memory when executed (that is, an image with state, or a user process). You can see a list of your running containers with the command, docker ps, just as you would in Linux.
+  
+  : A container runs natively on Linux and shares the kernel of the host machine with other containers. It runs a discrete process, taking no more memory than any other executable, making it lightweight.
+  By contrast, a virtual machine (VM) runs a full-blown “guest” operating system with virtual access to host resources through a hypervisor. In general, VMs provide an environment with more resources than most applications need.
+
+  : Docker for Mac − It allows one to run Docker containers on the Mac OS.
+  : Docker Engine − It is used for building Docker images and creating Docker containers.\
+  : Docker Hub − This is the registry which is used to host various Docker images. Docker images are built by other communities. You can also upload your own Docker built images to Docker hub.
+  : Docker Compose − This is used to define applications using multiple Docker containers.
+  : Image - In Docker, everything is based on Images. An image is a combination of a file system and parameters.
+
+------------------
+> DOCKER ARCHITECTURE
+------------------
+  >  App1 App2 App3
+     Docker Engine
+     Host OS
+     Server
+  > Docker engine is designed to work on various operating systems
+  > Docker Engine = Docker CLI + Docker Daemon (on Linux)
+    Docker Engine = Linux Virtual Machine (Docker CLI + Docker Daemon) (on Mac/Win)
+
+------------------
+> DOCKER HUB
+------------------
+  > This is the registry which is used to host various Docker images. Docker images are built by other communities. You can also upload your own Docker built images to Docker hub.
+  > https://www.docker.com/community-edition#/add_ons
+
+------------------
+> DOCKER IMAGE
+------------------
+  > The run command is used to mention that we want to create an instance of an image, which is then called a container.
+    > docker run hello-world
+  > docker image ls : Lists the images present on your system
+    OR docker images
+    OR docker images -q (returns only image ids)
+  > docker rmi <iamge-id> - Docker images on the system can be removed via the docker rmi command
+  > docker inspect <image-name>  - Used to see details of image
+
+------------------
+> DOCKER CONTAINER
+------------------
+  > Containers are instances of Docker images that can be run using the Docker run command. The basic purpose of Docker is to run containers.
+  > Run bash shell in a container
+    sudo docker run –it centos /bin/bash
+  > List Containers
+    docker ps     : List only running containers
+    docker ps -a  : Lists all containers whether running or not
+  > History
+    docker history ImageID : output will show all the commands run against that image.
+    docker history centos : The above command will show all the commands that were run against the centos image.
+
+  > Processes - see the top processes within a container.
+    docker top ContainerID
+  > Stop Container
+    docker stop ContainerID 
+  > Remove Container
+    docker rm ContainerID
+  > Stats
+    docker stats ContainerID
+  > Attach - to attach to a running container
+    docker attach ContainerID 
+  > Pause
+    docker pause ContainerID
+  > Unpause
+    docker unpause ContainerID
+  > Kill Processes - to kill the processes in a running container
+    docker kill ContainerID
+
+  > Container Lifecycle
+    : State = Created, Running, Paused, Killed, Stopped
+    -> Created -> Running -> (Pause -> Unpause) -> Running
+               -> Running -> (Stop -> Restart) -> Running
+               -> Running -> Killed
+
+  > nsenter
+    https://www.tutorialspoint.com/docker/docker_containers_and_shells.htm
+
+------------------
+> DOCKER CONFIGURING
+------------------
+  > Stop daemon process
+    service docker stop
+  > Start daemon process
+    service docker start
+
+------------------
+> DOCKERFILE
+------------------
+  > Blueprint for images
+  >   : defines what goes on in the environment inside your container. Access to resources like networking interfaces and disk drives is virtualized inside this environment, which is isolated from the rest of your system, so you need to map ports to the outside world, and be specific about what files you want to “copy in” to that environment. However, after doing that, you can expect that the build of your app defined in this Dockerfile behaves exactly the same wherever it runs.
+  > Docker also gives you the capability to create your own Docker images, and it can be done with the help of Docker Files. A Docker File is a simple text file with instructions on how to build your images.
+  > Name - Dockerfile
+  > Example
+    #This is a sample Image 
+    FROM ubuntu                   # Base Image
+    MAINTAINER demousr@gmail.com  # Who is going to maintain this image
+
+    RUN apt-get update            # Run Command
+    RUN apt-get install –y nginx 
+    CMD [“echo”,”Image created”]  # Display Message To User
+  ------------------
+  > BUILDING IMAGE - Generating an image from a Dockerfile
+  ------------------
+    docker build
+    docker build  -t ImageName:TagName dir
+      -t : is to mention a tag to the image
+      ImageName − This is the name you want to give to your image.
+      TagName − This is the tag you want to give to your image.
+      Dir − The directory where the Docker File is present.
+    Example: docker build –t myimage:0.1 .
+  > FROM
+  > RUN
+  > COPY
+  > WORKDIR
+  > CMD
+  > Eg.2
+    FROM ruby:2.6 # Use ruby 2.6 as the image to start with. If an image do not have a parent, then use `FROM scratch` (base image).
+    RUN apt-get update -yqq
+    RUN apt-get install -yqq --no-install-recommends nodejs
+    COPY . /usr/src/app/ # Copy our Rails app into the container at /usr/src/app.
+    WORKDIR /usr/src/app # To use rails directory as the default directory. By default, it is `/`
+    RUN bundle install
+
+------------------
+> PUBLIC REPOSITORIES
+------------------
+  > Public repositories can be used to host Docker images which can be used by everyone else. An example is the images which are available in Docker Hub.
+  > Steps to upload your own
+    1. Docker Hub - Log into Docker Hub and create your repository. This is the repository where your image will be stored. Go to https://hub.docker.com/ and log in with your credentials.
+    2. Create Repository - Click the button "Create Repository" on the above screen and create a repository with the name demorep. Make sure that the visibility of the repository is public.
+      Once the repository is created, make a note of the pull command which is attached to the repository.
+    3. Pull - docker pull <demousr/demorep>
+    4. Login - Issue the Docker login command to login into the Docker Hub repository from the command prompt. The Docker login command will prompt you for the username and password to the Docker Hub repository.
+      docker login
+    5. Tag - we need to tag our `myimage` to the new repository created in Docker Hub. We can do this via the `Docker tag` command.
+      docker tag imageID Repositoryname
+      eg. docker tag ab0c1d3744dd demousr/demorep:1.0
+    6. Push - Once the image has been tagged, it’s now time to push the image to the Docker Hub repository. We can do this via the Docker push command.
+      docker push Repositoryname
+      eg. docker push demousr/demorep:1.0
+
+------------------
+> MANAGING PORTS
+------------------
+  > In Docker, the containers themselves can have applications running on ports. When you run a container, if you want to access the application in the container via a port number, you need to map the port number of the container to the port number of the Docker host.
+  > Steps
+    1. Log into Docker Hub
+    2. Pull the required image
+    3. To understand what ports are exposed by the container, you should use the Docker inspect command to inspect the image.
+      docker inspect Container/Image
+      One is the data port of 8080 and the other is the control port of 50000.
+    4. To run and map the ports, you need to change the Docker run command and add the ‘p’ option which specifies the port mapping.
+      docker run -p 8080:8080 -p 50000:50000 <iamge-name>
+      The left-hand side of the port number mapping is the Docker host port to map to and the right-hand side is the Docker container port number.
+
+------------------
+> PRIVATE REPOSITORIES - TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_private_registries.htm
+  > You may not want to host the repositories on Docker Hub. For this, there is a repository container itself from Docker.
+  > Steps
+    1. Use the Docker run command to download the private registry.
+    docker run –d –p 5000:5000 –-name registry registry:2
+
+------------------
+> CREATING OUR WEBSERVER
+------------------
+  > Steps
+  1. Dockerfile
+    FROM ubuntu 
+    RUN apt-get update 
+    RUN apt-get install –y apache2 
+    RUN apt-get install –y apache2-utils 
+    RUN apt-get clean 
+    EXPOSE 80 CMD [“apache2ctl”, “-D”, “FOREGROUND”] # We are exposing port 80 for Apache in container
+  2. docker build –t=”mywebserver” . 
+  3. docker run –d –p 80:80 mywebserver 
+
+------------------
+> DOCKERFILE - INSTRUCTION COMMANDS
+------------------
+  > Docker has a host of instruction commands. These are commands that are put in the Docker File.
+  > CMD - This command is used to execute a command at runtime when the container is executed. It acts as the default command after a container is instantiated
+    CMD command param1
+    eg. CMD [“echo” , “hello world”] 
+  > ENTRYPOINT - This command can also be used to execute commands at runtime for the container. But we can be more flexible with the ENTRYPOINT command.
+    ENTRYPOINT command param1 
+    eg. ENTRYPOINT [“echo”] # Param passed while starting the container
+    docker run entrydemo Hello World
+  > ENV - This command is used to set environment variables in the container.
+    ENV key value
+    Eg. ENV var1=Tutorial var2=point 
+  > WORKDIR - This command is used to set the working directory of the container.
+    WORKDIR dirname
+    eg. WORKDIR /newtemp
+  > RUN - runs commands that are required to build up our required image. Can be used to install specific binaries we need and more.
+    Eg. RUN apt-get update
+
+------------------
+> CONTAINER LINKING - TODO
+------------------
+  > Container Linking allows multiple containers to link with each other. It is a better option than exposing ports. Let’s go step by step and learn how it works.
+  > https://www.tutorialspoint.com/docker/docker_container_linking.htm
+
+
+------------------
+> STORAGE DRIVERS - TODO
+------------------
+  > Docker has multiple storage drivers that allow one to work with the underlying storage devices. The following table shows the different storage drivers along with the technology used for the storage drivers.
+    ----------      -------------------
+    Technology      Storage Driver
+    ----------      -------------------
+    OverlayFS       overlay or overlay2
+    AUFS            aufs
+    Btrfs           brtfs
+    Device Manager  devicemanager
+    VFS             vfs
+    ZFS             zfs
+  > https://www.tutorialspoint.com/docker/docker_storage.htm
+
+------------------
+> DOCKER NETWORKING - TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_networking.htm
+
+------------------
+> SETUPS - TODO
+------------------
+  > Setting NodeJS
+    https://www.tutorialspoint.com/docker/docker_setting_nodejs.htm
+  > Setting MongoDB
+    https://www.tutorialspoint.com/docker/docker_setting_mongodb.htm
+  > Setting Nginx
+    https://www.tutorialspoint.com/docker/docker_setting_nginx.htm
+  > Setting ASP.NET
+    https://www.tutorialspoint.com/docker/docker_setting_asp.net.htm
+
+------------------
+> DOCKER TOOLBOX - TODO
+------------------
+  > The Docker toolbox is developed so that Docker containers can be run on Windows and MacOS. The site for toolbox on Windows is 
+    https://docs.docker.com/docker-for-windows/
+  > The toolbox consists of the following components −
+    Docker Engine − This is used as the base engine or Docker daemon that is used to run Docker containers.
+    Docker Machine − for running Docker machine commands.
+    Docker Compose for running Docker compose commands.
+    Kinematic − This is the Docker GUI built for Windows and Mac OS.
+    Oracle virtualbox
+  > Kitematic
+    This is the GUI equivalent of Docker on Windows. To open this GUI, go to the taskbar and on the Docker icon, right-click and choose to open Kitematic.
+  > 
+
+------------------
+> DOCKER CLOUD - TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_cloud.htm
+  > The Docker Cloud is a service provided by Docker in which you can carry out the following operations −
+
+    Nodes                   − You can connect the Docker Cloud to your existing cloud providers such as Azure and AWS to spin up containers on these environments.
+    Cloud Repository        − Provides a place where you can store your own repositories.
+    Continuous Integration  − Connect with Github and build a continuous integration pipeline.
+    Application Deployment  − Deploy and scale infrastructure and containers.
+    Continuous Deployment   − Can automate deployments.
+  > https://cloud.docker.com/
+
+------------------
+> DOCKER LOGGING - TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_logging.htm
+  > Docker has logging mechanisms in place which can be used to debug issues as and when they occur. There is logging at the daemon level and at the container level. Let’s look at the different levels of logging.
+  > 
+
+------------------
+> VOLUMES
+------------------
+  > A mounted volume acts like a shared directory between the container and the host, and is one way we can make local files accessible inside the container.
+  > Files in a volume aren’t part of the image itself; they are
+    overlaid onto the image at runtime (when you start a container.) If the mounted
+    files were essential, the image wouldn’t function without them, but the whole
+    point of images is to package up everything they need in order to run. Therefore,
+    it’s good practice to bake any needed files into the image itself.
+  > Types
+    - Local Volume - Specify location on disk to use as volume
+    - Named Volume - a self-contained bucket of file storage, completely managed by Docker
+      Eg.
+      ...
+        database:
+        - image: postgres
+        env_file:
+          - .env/development/database
+        volumes:
+          - db_data:/var/lib/postgresql/data
+      ...
+      volumes:
+        db_data:
+
+------------------
+> DOCKER COMPOSE
+------------------
+  > https://www.tutorialspoint.com/docker/docker_compose.htm
+  > Docker Compose is used to run multiple containers as a single service. For example, suppose you had an application which required NGNIX and MySQL, you could create one file which would start both the containers as a service without the need to start each one separately.
+  > Compose is declarative: you describe each part of your application—known as a service— and Compose handles the grunt work of ensuring the right containers are run when and how you need
+  > INSTALL
+    -> curl -L "https://github.com/docker/compose/releases/download/1.10.0-rc2/dockercompose -$(uname -s) -$(uname -m)" -o /home/demo/docker-compose
+    -> chmod +x /home/demo/docker-compose
+  > Eg.
+    version: '2'
+    services:
+      database:
+        image: mysql
+        ports:
+        - "3306:3306" # If we don't specify a port here, it will be hidden from the outside world which would be quite secure.
+        environment:
+          MYSQL_ROOT_PASSWORD=password
+          MYSQL_USER=root
+          MYSQL_PASSWORD=password
+          MYSQL_DATABASE=demodb
+      web:
+        build: . # Look for Dockerfile in the same directory
+        volumes:
+          - .:/usr/src/app # . looks for path relative to docker-compose.yml location
+        env_file:
+          - .env.development
+
+    -> The database and web keyword are used to define two separate services. One will be running our mysql database and the other will be our nginx web server.
+    -> The image keyword is used to specify the image from dockerhub for our mysql and nginx containers
+  > What happens with docker-compose up?
+    -> Creates a separate network just for the app
+    -> Creates any non-locally mounted volumes defined for the app
+    -> Builds an image for any services with a build directive
+    -> Creates a container for each service
+    -> Launches a container per service
+  > Compose will only build images if they don’t exist, which will either be because it’s the first time you’ve run docker-compose up or because you’ve deleted them.
+  > To rebuild images
+    docker-compose build
+    OR docker-compose up --build
+  > Detached Mode
+    docker-compose up -d
+    With -d option, we won't see the container output
+  > Container Life Cycle
+    -> CREATED --start-> RUNNING --stop/kill-> STOPPED --remove-> DELETED
+                                                       --start--> RUNNING
+                                 --restart--> RUNNING
+                                 --pause----> PAUSED --unpause-> RUNNING
+  > Commands
+    docker-compose ps
+    docker-compose stop
+    docker-compose stop <service-name> eg. web/database
+    docker-compose start <service-name>
+    docker-compose restart <service-name>
+    docker-compose logs -f web # Stream web service logs # this command displays the container output logs rather than the Rails server logs
+    docker-compose exec <service-name> <command> # Avoids starting a new container for one-off commands. Uses existing running one.
+    docker-compose run [OPTIONS] <service-name> <command> # Runs a new container to run the command
+    docker-compose down # Stop services
+    docker-compose up # Start services
+    docker-compose rm # Remove containers
+  > Networking
+    - By default, docker-compose creates a network and all the containers created are accessible inside this network. This is how different containers can interact with each other
+    > docker network ls
+    *> All Docker networks (except for the legacy bridge network) have built-in Domain
+      Name System (DNS) name resolution. That means that we can communicate
+      with other containers running on the same network by name. Compose uses the
+      service name (as defined in our docker-compose.yml) as the DNS entry. So if we
+      wanted to reach our web service, that’s accessible via the hostname web. This
+      provides a basic form of service discovery—a consistent way of finding
+      container-based services, even across container restarts.
+    > docker-compose run --rm redis redis-cli -h redis # -h option says connect to the `host` named `redis`
+    > Eg. redis = Redis.new(host: "redis", port: 6379)
+      You can connect to redis from rails app using the host `redis` now
+
+  > Eg.
+      version: "3"
+      services:
+        web:
+          # replace username/repo:tag with your name and image details
+          image: username/repo:tag
+          deploy:
+            replicas: 5
+            resources:
+              limits:
+                cpus: "0.1"
+                memory: 50M
+            restart_policy:
+              condition: on-failure
+          ports:
+            - "4000:80"
+          networks:
+            - webnet
+      networks:
+        webnet:
+
+------------------
+> PRUNING - FREE UP RESOURCES
+------------------
+  > docker image prune
+    Free up dangling images as we keep on re-building images
+  > docker container prune # Free up containers
+  > docker system prune # Free all resources in one go
+------------------
+> DOCKER CONTINUOUS INTEGRATION : TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_continuous_integration.htm
+  > Docker has integrations with many Continuous Integrations tools, which also includes the popular CI tool known as Jenkins. Within Jenkins, you have plugins available which can be used to work with containers. So let’s quickly look at a Docker plugin available for the Jenkins tool.
+
+------------------
+> KUBERNETES ARCHITECTURE - TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_kubernetes_architecture.htm
+  > Kubernetes is an orchestration framework for Docker containers which helps expose containers as services to the outside world. For example, you can have two services − One service would contain nginx and mongoDB, and another service would contain nginx and redis. Each service can have an IP or service point which can be connected by other applications. Kubernetes is then used to manage these services.
+  > 
+
+------------------
+> DOCKER KUBERNETES WORKING - TODO
+------------------
+  > https://www.tutorialspoint.com/docker/docker_working_of_kubernetes.htm
+
+
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+
+------------------
+> COMMON COMMANDS
+------------------
+  -- BASIC COMMANDS
+  > docker ps - List all containers
+  > docker --version
+  > docker info
+  > docker run hello-world
+    -> Gets the hello-world image if not already exists and runs it.
+    -> The run command is used to mention that we want to create an instance of an image, which is then called a container.
+    -> "hello-world" represents the image from which the container is made
+    : sudo docker run -it centos /bin/bash
+      runs bash after CentOS is up and running
+  > docker image ls : Lists the images present on your system
+    OR docker images
+    OR docker images -q (returns only image ids)
+    docker image ls --all
+  > docker container --help
+  > docker container ls ( List Docker containers running)
+    docker container ls --all (all)
+    docker container ls -aq (in quiet mode)
+  > docker build --tag=friendlyhello .
+    docker build -t=friendlyhello .
+    : Expects a Dockerfile
+    : Compiles into system local image registry
+  > docker run -p 4000:80 friendlyhello - Images can be downloaded from Docker Hub using the Docker run command
+    docker run -d -p 4000:80 friendlyhello (daemonized app - in background)
+  > docker container ls
+    docker container stop <container_id> : Stops container
+  > docker rmi <iamge-id> - Docker images on the system can be removed via the docker rmi command
+  > docker inspect <image-name>  - Used to see details of image
+
+  -- PULL/PUSH COMMANDS
+  > : Share image
+    docker login
+    docker tag image username/repository:tag
+      Eg. docker tag friendlyhello gordon/get-started:part2
+    docker push username/repository:tag (Pushes the image)
+  > docker run -p 4000:80 username/repository:tag (Pulls the image if necessary and runs that image)
+  
+  -- SCALE COMMANDS
+  > docker swarm init
+  > docker stack deploy -c docker-compose.yml getstartedlab
+  > docker service ls
+    OR
+    docker stack services getstartedlab
+  > A single container running in a service is called a task. Tasks are given unique IDs that numerically increment, up to the number of replicas you defined in docker-compose.yml. List the tasks for your service:
+    docker service ps getstartedlab_web
+    : Tasks also show up if you just list all the containers on your system, though that is not filtered by service:
+    docker container ls -q
+  > Redeploy:
+    docker stack deploy -c docker-compose.yml getstartedlab
+  > Remove the stack
+    docker stack rm getstartedlab
+    docker swarm leave --force
+  > 
+
+------------------
+> ORCHESTRATION
+------------------
+  > Ops
+    1. Provisioning - creating instances and hardware (VPCs, NATs, Firewalls, Proxises, etc) required to handle the load
+    2. Configuration management - Configuring the resources for use
+    3. Release management - release newer versions
+    4. Monitoring and alerting
+    5. Operating - Scaling up/down, diagnosing, etc
+  > Orchestration
+    The focus shifts to how we configure, run, and update the multiple containers that make up an application in concert, a process known as (container) orchestration.
+  > Orchestrators
+    -> Swarm
+      - Docker owned
+      - Basic tool
+    -> Kubernetes
+      - Started by Google. Now owned by CNCF
+      - Advanced tool with support for autoscaling
+    -> Amazon Elastic Container Service (ECS)
+      - For AWS
+  > IaaS vs CaaS (Container as a Service)
+    - Heroku - CaaS
+    - AWS/Azure/GCP/DigitalOcean - IaaS -> Offer barebone infrastructure
+  ------------------
+  > DOCKER MACHING
+  ------------------
+    - standalone tool for provisioning and managing Docker-ready instances
+    - lightweight
+    - adapter pattern - Docker Machine uses the adapter pattern, providing different drivers capable of creating instances on a wide variety of platforms. We’ll use this shortly to create local VirtualBox instances and then create cloud-based infrastructure.
+  > Chef, Puppet, and Ansible
+    > Traditionally, configuration management tools like Chef, Ansible, and Puppet
+      have been used to provision infrastructure and configure it, including installing
+      and managing software on instances. However, as we’ve already discussed, since
+      Docker images are now responsible for most of your server configuration, the
+      need for these other tools is greatly diminished.
+    > Puppet - 2005
+    > Chef - 2009
+  > Terraform
+    - 2014
+    - open-source infrastructure as code software tool created by HashiCorp. It enables users to define and provision a datacenter infrastructure using a high-level configuration language known as Hashicorp Configuration Language (HCL), or optionally JSON
+  > CaaS
+    - Amazon ECS (ECS) - ECS has a proprietary orchestration layer,
+    - Google Kubernetes Engine (GKE)
+    - Amazon ECS for Kubernetes (EKS) - requires more manual work to get your clusters up and running. More flexible and highly available clusters
+    - Azure Kubernetes Service (AKS)
+  > Serverless OR Function As A Service (FaaS)
+    - AWS Lambda
+    - Firebase
+    - Although the code you supply is typically turned into containers behind the scenes, that’s an implementation detail you don’t need to care about. The benefit to this computing model is that you completely remove the need to provision infrastructure, and scaling happens automatically based on load.
+    - a major downside is that you are limited by the languages and tooling supported by the FAAS platform. If, instead of supplying raw code files, you provide your own Docker images, you get all the benefits of FAAS, but with fewer runtime limitations. Rather than being constrained by the platform, you have full control over what languages and tooling your code uses.
+    *-* AWS Fargate : AWS Fargate is a new platform from Amazon that puts a serverless spin on their ECS and EKS services. Both ECS and EKS, by default, require some manual steps to create the EC2 instances that will run the containers. Fargate is a drop-in replacement compute engine for ECS and EKS that removes the need to think about and manage server instances.
+    - Microsoft Azure Container Instances - Microsoft Azure Container Instances (ACI) is a much more limited form of serverless for containers. It can’t be used to run a standard containerized application like our Rails app we’ve been building throughout the book. Instead, it’s intended for applications that have built from the ground up to be Serverless; it’s suitable for discrete tasks (such as data processing) or event-driven applications.
+
+  > IaaS is typically cheaper than CaaS, which is cheaper than Serverless. However, the less managed, the more upfront engineering effort is required.
+
+------------------
+> DOCKER REGISTRIES
+------------------
+  > we can share our Docker images by pushing them to a centralized Docker image-hosting service—or in Docker parlance, Docker Registries
+  > Docker provides its own hosted Registry called Docker Hub, which with a free account, gives you unlimited public repos and one private repo
+    - hub.docker.com
+  > There are other options than Docker Hub though
+    - Amazon Elastic Container Registry
+    - Google Cloud Container Registry
+    - Microsoft Azure Container Registry
+    - Quay
+    - Docker Registry is an open source project that you can run on your own infrastructure.
+    - Another good option is Harbor, a more fully featured Docker Registry under the care of the CNCF
+  > Naming
+    [<registry hostname>[:port]/]<username>/<image name>[:<tag>]
+    registry hostname defaults to docker hub
+
+------------------
+> PRODUCTION-LIKE PLAYGROUND
+------------------
+  > Docker Machine is a command-line tool that can create Docker-ready instances for us
+  > docker-machine ls
+
+  
+------------------
+> SWARMS
+------------------
+  : A swarm is a group of machines that are running Docker and joined into a cluster. After that has happened, you continue to run the Docker commands you’re used to, but now they are executed on a cluster by a swarm manager. The machines in a swarm can be physical or virtual. After joining a swarm, they are referred to as nodes.
+
+  : Swarm managers can use several strategies to run containers, such as “emptiest node” -- which fills the least utilized machines with containers. Or “global”, which ensures that each machine gets exactly one instance of the specified container. You instruct the swarm manager to use these strategies in the Compose file, just like the one you have already been using.
+
+  : Swarm managers are the only machines in a swarm that can execute your commands, or authorize other machines to join the swarm as workers. Workers are just there to provide capacity and do not have the authority to tell any other machine what it can and cannot do.
+
+  : Up until now, you have been using Docker in a single-host mode on your local machine. But Docker also can be switched into swarm mode, and that’s what enables the use of swarms. Enabling swarm mode instantly makes the current machine a swarm manager. From then on, Docker runs the commands you execute on the swarm you’re managing, rather than just on the current machine.
+
+  : Swarm is declarative: we tell it the state we want our application to be in, and it pulls the various knobs and levers to make this happen. As you’d hope, it leverages the docker-compose.yml format that we’ve used to specify our application.
+
+  > Turn instance into a swarm
+    docker swarm init
+    docker swarm init --advertise-addr <IP address of instance>
+    -> This will create a single node cluster for you where you can deploy your containerized applications
+
+  > docker swarm join
+
+    ------------------
+  *> docker-stack.yml
+    ------------------
+    Swarm introduces the concept of a stack to mean an application made up of a
+    group of services that are capable of being deployed. We describe our stack to
+    Swarm with a deployment-focused variant of a Compose file known as a stack
+    file. Although you’ll sometimes still hear this referred to as a Compose file,
+    we’ll stick with the latter since it clearly distinguishes it from a normal Compose
+    file.
+    Eg.
+
+    version: '3'
+    services:
+      web:
+        image: robisenberg/myapp_web:prod # with Swarm, we must specify a preexisting image to use. build directive wont work
+        ports:
+          - "80:3000"
+        env_file:
+          - .env/production/database
+          - .env/production/web
+      
+      redis:
+        image: redis
+      
+      database:
+        image: postgres
+        env_file:
+          - .env/production/database
+        volumes:
+          - db_data:/var/lib/postgresql/data
+
+      db-migrator:
+        image: robisenberg/myapp_web:prod
+          command: ["./wait-for", "--timeout=300", "database:5432", "--", "bin/rails", "db:migrate"]
+        env_file:
+          - .env/production/database
+          - .env/production/web
+        deploy:
+          restart_policy:
+            condition: none
+    volumes:
+      db_data:
+
+    ->  docker stack deploy -c docker-stack.yml myapp
+      Deploy the services described in docker-stack.yml as a stack called myapp
+    -> docker stack services myapp
+       OR
+       docker service ls
+
+  > Scaling the Cluster
+    docker service scale myapp_web=<n> # Run n instances of web service
+
+    ------------------
+  > Docker on DigitalOcean
+    ------------------
+    1.  Create Instance
+        docker-machine create \
+        --driver digitalocean \
+        --digitalocean-access-token $DIGITAL_OCEAN_TOKEN \ # NEED TO GET TOKEN FROM DIGITALOCEAN AND STORE IN BASH FILE WITH THIS ENV NAME
+        --digitalocean-region lon1 \
+        do-manager-1
+    2. Login to instance
+       docker-machine ssh <instance name>
+    3. Get Public IP Address
+       ifconfig eth0
+    4. Initialize Swarm
+       docker swarm init --advertise-addr 46.101.90.10
+    5. 3-Node Cluster
+        docker-machine create \
+        --driver digitalocean \
+        --digitalocean-access-token $DIGITAL_OCEAN_TOKEN \
+        --digitalocean-region lon1 \
+        do-worker-1
+
+        docker-machine create \
+        --driver digitalocean \
+        --digitalocean-access-token $DIGITAL_OCEAN_TOKEN \
+        --digitalocean-region lon1 \
+        do-worker-2
+
+        SWARM_TOKEN=SWMTKN-1-0axry1rp0wxy6u48t4epiml4mubf9qy2y2o2fdmq1u7n2vnj08-aoqoyn55bypasn82emb3sae27
+        MANAGER_INTERNAL_IP=46.101.90.10
+        docker-machine ssh do-worker-1 "docker swarm join --token $SWARM_TOKEN $MANAGER_INTERNAL_IP:2377"
+        docker-machine ssh do-worker-2 "docker swarm join --token $SWARM_TOKEN $MANAGER_INTERNAL_IP:2377"
+
+        OR WRITE A SCRIPT
+          SWARM_TOKEN=SWMTKN-1-0axry1rp0wxy6u48t4epiml4mubf9qy2y2o2fdmq1u7n2vnj08-aoqoyn55bypasn82emb3sae27
+          MANAGER_INTERNAL_IP=46.101.90.10
+          for i in 1 2
+          do
+            # create the node
+            docker-machine create \
+            --driver digitalocean \
+            --digitalocean-access-token $DIGITAL_OCEAN_TOKEN \
+            do-worker-$i
+            # join the swarm
+            docker-machine ssh do-worker-$i "docker swarm join --token $SWARM_TOKEN $MANAGER_INTERNAL_IP:2377"
+          done
+    6. Deploy the app to the 3-Node Cluster
+        eval $(docker-machine env do-manager-1) # configuring our Docker CLI to point to one of the manager nodes
+        docker stack deploy -c docker-stack.yml myapp
+    7. Check the services running
+        docker service ls
+        OR
+        docker stack ps myapp # See the actual containers
+    8. Scale the services up/down as desired
+        docker service scale myapp_web=3
+        docker service scale myapp_web=1
+
+        -> Can also be configured in docker-stack.yml file
+          web:
+            image: robisenberg/myapp_web:prod
+            ports:
+              - "80:3000"
+            env_file:
+              - .env/production/database
+              - .env/production/web
+            deploy:
+              replicas: 2
+    9. Check on which nodes services are running
+        docker stack services myapp
+        docker stack ps myapp
+
+
+  > Removing nodes from cluster
+    docker swarm leave : From each node
+  

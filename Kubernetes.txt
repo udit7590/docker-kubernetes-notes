@@ -1,0 +1,101 @@
+------------------
+KUBERNETES
+- Open Source Container Orchestrator
+- Developed by Google
+- Founded by Joe Beda, Brendan Burns and Craig McLuckie
+- 7 June 2014
+- Now owned by, Cloud Native Computing Foundation
+- kubernetes.io
+- Written in Go
+------------------
+
+------------------
+> KEY FACTORS
+------------------
+  > VELOCITY : Not number of features you can ship per hour or day anymore but also need to maintain high availablility
+    - Kubernetes enable this through
+      : Immutability -                Container cannot be modified using user modifications. Hence immutable. With a mutable system, the infrastructure has incremental updates. In immutable system, entire image is rebuilt and is replaced by older one in a single operation
+      : Declarative configuration -   Everything in Kubernetes is a Declarative Configuration object that represents the desired state of the system. Vs imperative configuration where the state of the world is defined by the execution of a series of instructions rather than a declaration of the desired state of the world. “With an imperative approach, the configuration would say “run A, run B, and run C.” The corresponding declarative configuration would be “replicas equals three.”
+      : Online self-healing systems - Kubernetes continuously takes actions to ensure that the current state matches the desired state. This means that not only will Kubernetes initialize your system, but it will guard it against any failures or perturbations that might destabilize the system and affect reliability. Can increase velocity since the time a dev spends on repairing systems can be spent on testing and dev of new features. Kubernetes has a concept of "operators" which is another container that sits inside cluster and responsible for self-healing tasks.
+  > SCALING - SETVICE & TEAMS
+    - Kubernetes enable this through
+      : Decoupling -                    In a decoupled architecture, each component is separated from other components by defined APIs and service load balancers. APIs and load balancers isolate each piece of the system from the others. APIs provide a buffer between implementer and consumer, and load balancers provide a buffer between running instances of each service.
+      : Scaling Dev teams through Microservices - Ideal team size os 2-pizza team (6-8 people). Here knowledge sharing is good, decision making is fast and they have a common sense of purpose. Kubernetes provides numerous abstractions and APIs that make it easier to build these decoupled microservice architectures:
+        : Pods - “or groups of containers, can group together container images developed by different teams into a single deployable unit.”
+        : Services - “Kubernetes services provide load balancing, naming, and discovery to isolate one microservice from another.”
+        : Namespaces - “Namespaces provide isolation and access control, so that each microservice can control the degree to which other services interact with it.”
+        : Ingress - “Ingress objects provide an easy-to-use frontend that can combine multiple microservices into a single externalized API surface area.”
+      “Finally, decoupling the application container image and machine means that different microservices can colocate on the same machine without interfering with one another, reducing the overhead and cost of microservice architectures. The health-checking and rollout features of Kubernetes guarantee a consistent approach to application rollout and reliability that ensures that a proliferation of microservice teams does not also result in a proliferation of different approaches to service production lifecycle and operations.”
+      : Seperation of Concerns for Consistency and Scaling - the decoupling and separation of concerns produced by the Kubernetes stack lead to significantly greater consistency for the lower levels of your infrastructure.
+
+> Containers fall into two main categories:
+  > System containers - “System containers seek to mimic virtual machines and often run a full boot process. They often include a set of system services typically found in a VM, such as ssh, cron, and syslog. When Docker was new, these types of containers were much more common. Over time, they have come to be seen as poor practice and application containers have gained favor.”
+  > Application containers - “Application containers differ from system containers in that they commonly run a single program. While running a single program per container might seem like an unnecessary constraint, it provides the perfect level of granularity for composing scalable applications and is a design philosophy that is leveraged heavily by Pods.”
+> Image Security - Never store any secrets in any layer of an image.
+                 - Deleting a unnecessary file from one layer does not remove it from upper layers. They are still packaged into image but just inaccessible.
+> Multistage Image Builds
+  - “One of the most common ways to accidentally build large images is to do the actual program compilation as part of the construction of the application container image. Compiling code as part of the image build feels natural, and it is the easiest way to build a container image from your program. The trouble with doing this is that it leaves all of the unnecessary development tools, which are usually quite large, lying around inside of your image and slowing down your deployments. To resolve this problem, Docker introduced multistage builds. With multistage builds, rather than producing a single image, a Docker file can actually produce multiple images. Each image is considered a stage. Artifacts can be copied from preceding stages to the current stage.”
+
+------------------
+> KUBERNETES OBJECTS
+------------------
+
+  > Kubernetes defines a set of building blocks ("primitives"), which collectively provide mechanisms that deploy, maintain, and scale applications based on CPU, memory or custom metrics.
+  > Kubernetes is loosely coupled and extensible to meet different workloads
+  > Kubernetes API
+  > Key Objects
+    - PODS
+      : A pod is a higher level of abstraction grouping containerized components. A pod consists of one or more containers that are guaranteed to be co-located on the host machine and can share resources. The basic scheduling unit in Kubernetes is a pod.
+      : Each pod in Kubernetes is assigned a unique Pod IP address within the cluster, which allows applications to use ports without the risk of conflict
+      : Within the pod, all containers can reference each other on localhost
+      : A pod can define a volume, such as a local disk directory or a network disk, and expose it to the containers in the pod.
+    - REPLICA SETS
+      : Replica Sets are a grouping mechanism that lets Kubernetes maintain the number of instances that have been declared for a given pod.
+    - SERVICES
+      : A Kubernetes service is a set of pods that work together, such as one tier of a multi-tier application. The set of pods that constitute a service are defined by a label selector
+      : Kubernetes provides two modes of service discovery, using environmental variables or using Kubernetes DNS
+    - VOLUMES
+      : Filesystems in the Kubernetes container provide ephemeral storage, by default. This means that a restart of the pod will wipe out any data on such containers, and therefore, this form of storage is quite limiting in anything but trivial applications. A Kubernetes Volume provides persistent storage that exists for the lifetime of the pod itself.
+    - NAMESPACES
+      : Kubernetes provides a partitioning of the resources it manages into non-overlapping sets called namespaces. They are intended for use in environments with many users spread across multiple teams, or projects, or even separating environments like development, test, and production.
+    - ConfigMaps AND SECRETS
+      : A common application challenge is deciding where to store and manage configuration information, some of which may contain sensitive data. Configuration data can be anything as fine-grained as individual properties or coarse-grained information like entire configuration files or JSON / XML documents. Kubernetes provides two closely related mechanisms to deal with this need: "configmaps" and "secrets", both of which allow for configuration changes to be made without requiring an application build.
+      : The biggest difference between a secret and a configmap is that the content of the data in a secret is base64 encoded.
+    - STATEFULSETS
+      : It is very easy to address the scaling of stateless applications: one simply adds more running pods—which is something that Kubernetes does very well.
+      : Stateful workloads are much harder, because the state needs to be preserved if a pod is restarted, and if the application is scaled up or down, then the state may need to be redistributed. Eg. Databases
+      : StatefulSets are controllers (see Controller Manager, below) that are provided by Kubernetes that enforce the properties of uniqueness and ordering amongst instances of a pod and can be used to run stateful applications.
+
+------------------
+> AWS DEPLOY
+------------------
+  > AWS CLI 
+  > aws configure
+    - Enter keys
+  > aws ec2 describe-vpcs --region us-east-1 --query="Vpcs[*].{ID:VpcId,tags:Tags[0]}"
+  > aws ec2 describe-subnets --filters "Name=vpc-id,Values=vpc-a0e9c0c7" --query="Subnets[*].SubnetId"
+
+------------------
+> KUBERNETES ARCHITECTURE
+------------------
+  > Kubernetes works with a node-master architecture. All the nodes run an agent that’s called kubelet and the master runs other components such as APIs (application programming interfaces) and a scheduler
+  > All the nodes have Docker and are managed from the master systems. Kubelet is in charge of managing the Pods and the containers in all aspects.
+  > The nodes also run a network proxy and load balancer. These allow us to have static end points for our container, which are defined through services. This is the part that allows communication inside the cluster between the different services but also from outside the cluster.
+  > On the master, the essential components are etcd, which is a key-value data store that keeps the state and allows the coordination between components, and the scheduler, which, as you can imagine, manages the scheduling of the pods.
+  > 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

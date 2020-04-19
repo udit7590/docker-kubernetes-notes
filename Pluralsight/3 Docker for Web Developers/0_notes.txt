@@ -1,0 +1,536 @@
+Mix of
+  (:1) Docker for Web Developers by Dan Wahlin
+  (:2) Docker Deep Dive by Nigel Poulton
+
+--------------------------------------------------------------------------------------------------
+> Docker Basics
+--------------------------------------------------------------------------------------------------
+  > Docker Image
+    - A read onl template composed of layered filesystems used to share common files and create Docker container instances.
+  > Container
+    - An isolated and secured shipping container created from an image that can be run, started, stopped, moved and deleted
+    - Isolated area of an OS with resource usage limits applied
+  > You need VM if you need to run Docker not on Linux
+  > Benefits
+    - Accelerate developer onboarding
+    - Eliminate app conflicts
+    - Ship software faster
+    - Environment Consistency
+  > Docker Tools
+    - Docker Toolbox : Win 7/8 or Mac
+    - Provides image and container tools
+    - Virtual Machine (Win / Mac)
+  > Docker Community Edition for Mac or Win 10 and above
+    - User Hyper-V/Hyperkit
+  > Docker Toolbox Tools
+    - Docker Client
+    - Docker Machine
+    - Docker Compose
+      : Build multiple containers
+      : Orchestrate/Destroy containers
+    - Docker Kinematic : UI Tool for containers
+    - VirtualBox
+
+--------------------------------------------------------------------------------------------------
+> Setting Up Your Docker Environment
+--------------------------------------------------------------------------------------------------
+  > For Mac
+    - store.docker.com
+      - CE edition : Stable vs Edge
+      - Preferences -> File Sharing -> Ensure there is /Users in the sharing folders
+      - docker # Help with all the commands
+      - docker images
+  > Docker Kinematic
+    - GUI used to provision VMs and work with images and containers
+    - Visually search for Docker Images
+    - Create, Run and Manage Containers
+
+--------------------------------------------------------------------------------------------------
+> USING DOCKER TOOLS
+--------------------------------------------------------------------------------------------------
+  > Docker Machine (Only required for older versions if we are not using Docker CE)
+    - Create and manage local machines
+    - Create and manage cloud machines
+    - Configure Docker client to talk to machines
+    - By default we have a `default` machine setup. It is basically a VM machine
+      -----------------
+    - Basic Commands
+      -----------------
+      : docker-machine # HELP
+      : docker-machine ls
+      : docker-machine start [machine-name]
+      : docker-machine stop [machine-name]
+      : docker-machine env [machine-name]
+      : docker-machine ip [machine-name]
+  > Docker Client
+    - Interact with Docker Engine
+    - Build and Manage Images
+    - Run and Manage Containers
+      -----------------
+    - Basic Commands
+      -----------------
+      : docker pull [image-name]
+      : docker run [image-name]
+        docker run -p 80:80 [image-name]
+        # It'll also download the image if it is not found locally
+      : docker images # List images
+      : docker ps # Running containers
+        docker ps -a # All containers
+      : docker rm [container-id] # Deletes container
+      : docker rmi [image-id] # Deletes image
+        initial few characters of id are also fine
+    - Look for docker images at Docker Hub
+  > 
+
+--------------------------------------------------------------------------------------------------
+> :2 Architecture & Theory
+--------------------------------------------------------------------------------------------------
+  > History
+    : Before Docker, containers always existed. Big companies actually used to deal with kernels to do it.
+      Docker made everything easy with Namespaces and CGroups
+    : dotCloud was the name of the company before
+    : 
+  > Kernel Primitives
+    - Namespaces
+      : For isolation
+      : Carve the OS into multiple OSes
+        : Eg pid, net, mount, ipc, uts, user, ...
+    - Control Groups (CGroups) - In Windows : Job Objects
+      : Grouping processes
+      : Imposing resource limits
+    - Layers
+      : Union file system/mount & CoW
+  > Docker Engine
+    - When we start a container, 
+      : Docker Daemon receives a request using the API {Over REST}
+      : deamon starts containerD process on Linux { Over GRPC - CNCF project }
+      : containerD (CNCF project) runs a shim for `runc` and `runc` starts the actual container
+      : Each container has its own shim process connected to `runc`
+    - Quite modular. We can replace containerD and runc
+    - We can even restart docker daemon without affecting containers running
+
+--------------------------------------------------------------------------------------------------
+> :2 WORKING WITH IMAGES
+--------------------------------------------------------------------------------------------------
+  > An Image is a readonly template for creating application containers
+  > An image is Build-Time and Container is Run-Time
+  > An image has a bunch of layers and a JSON manifest file. Manifest files loosely connects these layers
+    - One layer has no reference to other layers in the image
+    - Each layer has files and objects
+    - One will be a base layer which will basically have all the OS files and directories
+    - Each container also has a Read/Write layers which stores all the logs, etc for the container. When the container is deleted, the layer also gets deleted
+  > Each image has a sha or a digest which helps to uniquely identify an image
+  > Pulled images get stored in `/var/lib/docker/<storage-driver>`
+    -----------------
+  > Basic Commands
+    -----------------
+    - docker image pull redis
+      : 0. Pulls a Fat Manifest to see if our OS is supported. It then pulls the manifest for our OS.
+      : 1. Get the manifest file
+      : 2. Pulls individual layers of the image
+    - docker image ls
+    - docker image ls --digests
+      : Shows the digests for the images
+    - docker system info
+    - docker history <image-name>
+      : Will show what created different layers for the image and also the changes to environment variables/JSONs
+    - docker images inspect <image-name>
+      : Gives the config and layers of the image
+    - docker image rm <image-name>
+    - docker image pull <image-name> -a
+      : Pulls all the images for my OS for the repo
+  > Registries
+    - Images live in registries
+    - Official and Unofficial images
+      : Eg. redis image lives at docker.io/redis. While referencing official images, we can skip docker.io
+      : Unofficial images sits behind a username
+        Eg. docker.io/udit7590/some_project/latest
+    - Each Registry has Repos and each Repo has Images which are tagged
+      : Registry -> Repo -> Image (Tag)
+      : Eg. docker.io/redis/latest -> by default pulls the latest image
+      : docker image pull docker.io/redis:4.0.1
+    - While we are pushing images, we compress them. But since each layer has a SHA (called CONTENT HASHES, it changes due to compression.
+      Hence, we also send these new hashes (Known as DISTRIBUTION HASHES).
+  > Best Practices
+    - Refrain from using latest tag repositories. Be explicit about the version you need to keep things stable
+    - Keep image size smaller so that they are easier to maintain
+
+--------------------------------------------------------------------------------------------------
+> :2 CONTAINERIZING AN APP - Dockerfile
+--------------------------------------------------------------------------------------------------
+  > Dockerfile - A list of instructions on how to build an image an image with our code inside
+    - After making the Dockerfile, we use it to build an image. This image can then be containerized
+    - CAPITALIZE instructions (Just a convention)
+    ---------------------
+    DIFFERENT INSTRUCTIONS
+    ---------------------
+    - Syntax:  <INSTRUCTION> <value>
+    - FROM is always the first line
+    - Good practice to list maintainer
+    - RUN = execute command and create layer
+    - COPY = copies files from our file system to the docker image - Creates new layer
+    - WORKDIR /src = sets the working directory. No new layer created as it's just metadata
+    - ENV RAILS_ENV=production RAILS_PORT=300
+    - EXPOSE 8080 = exposes the port. Only metadata
+      EXPOSE $RAILS_PORT
+    - ENTRYPOINT ["node", "./app.js"]
+    - VOLUME ["/var/www", "/logs"] - 
+    ---------------------
+  > Basic Commands
+    ---------------------
+    - docker image build -t <image_tag> <build-context>
+      - docker container run -d --name web1 -p 8080:8080 psweb
+    - docker image build -t psweb <github_url>
+      : We can also build the image directly from a remote repo
+  > Build context - Location of your code
+  > When the commands are running - like RUN instructions, docker spaws a new container, runs the commands, outputs the layer and kills the temporary container
+  > Multi Stage Builds
+    - It's a best practice to keep image sizes smaller.
+    - Multi stage builds allow to separate the production build different from other dependencies.
+    - The final production image will be lot less smaller
+    - See image as the example
+
+--------------------------------------------------------------------------------------------------
+> HOOKING YOUR SOURCE CODE IN A CONTAINER
+--------------------------------------------------------------------------------------------------
+  > Layered File System
+    - Each Image has multiple layers and is read Only
+    - Containers share the image files
+    - Containers have an individual read-write layer which is deleted when container is deleted
+  > Volumes
+    - Special type of directory in a container typically referred to as a "data volume"
+    - Can be shared and reused among containers
+    - Updates to an image won't affect a data volume
+    - Data volumes are persisted even after the container is deleted
+    - You can decide where volume will write the data or you can let docker handle where to write
+    - It is basically an alias to an actual data directory on the docker host. Hence, when we delete the container, it doesn't affect the volume
+      -----------------------------
+    - Basic Commands
+      -----------------------------
+      : docker run -p 8080:3000 -v /var/www node
+        docker run -v <where_to_store_in_file_system>:<alias_for_the_volume_in_container>
+      : Locating a volume
+        docker inspect <container-name>
+        -> Will have a "Mounts" section with the info for volumes
+          Eg. "Mounts": [{
+            "Name": "ds...asf",
+            "Source": "/mnt/.../var/lib/docker/volumes/ds...asf/_data",
+            "Destination": "/var/www",
+            "RW": true
+          }]
+      : Customizing volumes
+        docker run -p 8080:3000 -v $(pwd):/var/www node
+      : Removing Volumes
+        docker rm -v <last_container_id> # If other containers are using the volume, it wont be deleted
+      : Hooking the source code into a container (This is one of the ways to do this)
+        docker run -p 8080:3000 -v $(pwd):/var/www -w "/var/www" node npm start
+        -w sets the working directory
+        npm start runs the command after creating the container in the working directory
+      : Pushing your custom image
+        docker push <username>/node
+
+--------------------------------------------------------------------------------------------------
+> COMMUNICATING BETWEEN DOCKER CONTAINERS
+--------------------------------------------------------------------------------------------------
+  > Docker Container Linking Options
+    > Use Legacy Linking - Used for mostly dev environments
+      - Step 1: Run a container with a name
+        docker run -d --name <custom-name> <image-name>
+      - Step 2: Link to running container by name
+        docker run -d -p 5000:5000 --link <custom-name-of-linked-container>:<linked-container-alias>  <image-name>
+      - Step 3: Repeat for additional containers
+      > Eg. Connecting NodeJS with MongoDB
+        - docker run -d --name myapp-mongodb mongo
+        - docker run id -p 3000:3000 --link myapp-mongodb:mongodb myapp/node
+          Here, mongodb is the alias for node container and code can refer to the `mongodb` using this alias as the `host`.
+      > Eg.2 For an ASP.NET app
+        - docker run -d --name my-postgres -e POSTGRES_PASSWORD=password postgres
+        - docker run -d -p 5000:5000 --link my-postgres:postgres my_username/aspnet
+    
+    > Add containers to a bridge network
+      - Step 1: Create a custom bridge network
+        docker network create --driver bridge isolated_network
+      - Step 2: Run containers in the network
+        docker run -d --net=isolated_network --name mongodb mongo
+
+      > Eg. Connecting NodeJS with MongoDB
+        - docker network create --driver bridge isolated_network
+        - docker run -d --net=isolated_network --name mongodb mongo
+        - docker run -d --net=isolated_network --name nodeapp -p 3000:3000 my_username/app_name
+        - docker network inspect isolated_network
+          # Containers section will show list of containers in the network
+        - docker exec nodeapp node seed.js
+        -----------------------------
+      > Other Basic Commands
+        -----------------------------
+        - docker network ls
+        - docker network inspect <network_name>
+
+    > Running a command inside a running container
+      docker ps # Find name of container
+      docker exec d612s node dbSeeder.js
+      - docker exec <container-name> <command>
+
+--------------------------------------------------------------------------------------------------
+>*** MANAGING CONTAINERS WITH DOCKER COMPOSE - docker-compose.yml
+--------------------------------------------------------------------------------------------------
+  > In the development env, it manages the whole application lifecycle
+    - Start, stop and rebuild services
+    - View the status of running services
+    - Stream the log output of running services
+    - Run a one-off command on a service
+  > Docker Compose Workflow
+    - Build services
+    - Start up services
+    - Tear down services
+  > Key Service configuration options in a docker-compose.yml file
+    - build
+    - environment
+    - image
+    - networks
+    - ports
+    - volumes
+    -----------------------------
+  > Basic Commands
+    -----------------------------
+    - docker-compose build
+      # Builds or rebuilds the services defined in docker-compose.yml
+      docker-compose build <service-name>
+      # Builds a single service (in case we don't need to build all of them again)
+    - docker-compose up
+      # Create and start the containers from the images
+      docker-compose up --no-deps node
+      # Only starts node container. It'll rebuild the node image and stop, destroy and recreate only node
+      # --no-deps does not recreate the services that node depends on
+      docker-compose up -d
+      # Runs in daemon mode
+    - docker-compose down
+      # Stops the containers and removes them
+      docker-compose down --rmi all --volumes
+      # Also removes the images and also the volumes
+    - docker-compose logs
+      # Will start a stream for all the container logs
+    - docker-compose ps
+      # Shows containers
+    - docker-compose stop
+    - docker-compose start
+    - docker-compose rm
+  > Example
+    version: '2'
+    services:
+      node:
+        build:
+          context: .
+          dockerfile: node.dockerfile
+        ports:
+          - "3000:3000"
+        networks:
+          -nodeapp-network
+      mongodb:
+        image: mongo
+        networks:
+          -nodeapp-network
+    networks:
+      nodeapp-network
+      driver: bridge
+  > Complex Example 2
+    nginx.dockerfile
+    -----------------
+      FROM nginx:latest
+      MAINTAINER Udit Mittal
+      VOLUME /var/cache/nginx
+
+      COPY ./.docker/config/nginx.conf /etc/nginx/nginx.conf # You can also find an example file on nginx docker docs
+      COPY .public /var/www/public
+      COPY ./.certs/server.crt /etc/nginx/server.crt
+      COPY ./.certs/server.key /etc/nginx/server.key
+      COPY ./.certs/cert.pem /etc/nginx/cert.pem
+
+      RUN chmod 600 /etc/nginx/server.key
+      EXPOSE 80 443
+
+      ENTRYPOINT ["nginx"]
+      CMD ["-g", "daemon off;"]
+
+      # To Build
+      docker build -f nginx.dockerfile --tag uditmittal/nginx ../
+      # To Run
+      docker run -d -p 80:6379 nginx uditmittal/nginx
+
+    node.dockerfile
+    -----------------
+      FROM node:latest
+      WORKDIR /var/www/codewritten
+      RUN npm install -g pm2@latest
+      RUN mkdir -p /var/log/pm2
+      EXPOSE 8080
+      ENTRYPOINT ["pm2", "start", "server.js", "--name", "codewithdan", "--log", "/var/log/pm2/pm2.log"]
+
+    mongo.dockerfile
+    -----------------
+      FROM mongo:latest
+      MAINTAINER Udit Mittal
+      RUN apt-get update && apt-get install -y netcat-traditional netcat-openbsd
+      COPY ./.docker/mongo_scripts /mongo_scripts
+      RUN chmod +rx /mongo_scripts/*.sh
+      RUN touch /.firstrun
+      EXPOSE 27017
+      ENTRYPOINT ["/mongo_scripts/run.sh"] # You can find this in mongo docker documentation as well
+      # To Build
+      docker build -f mongo.dockerfile --tag uditmittal/mongo ../
+      # To Run
+      docker run -p 27017:27017 --env-file .docker/mongo/mongo.development.env -d --name mongo uditmittal/mongo
+      # You can pass env variable used by the .sh file in the env file
+
+    redis.dockerfile
+    -----------------
+      FROM redis:latest
+      MAINTAINER Udit Mittal
+      ENV APP_ENV development
+      COPY ./.docker/config/redis.${APP_ENV}.conf /etc/redis.conf
+      EXPOSE 6379
+      ENTRYPOINT ["redis-server", "/etc/redis.conf"]
+
+    docker-compose.yml
+    -------------------
+      version: "2"
+      services:
+        nginx:
+          container_name: nginx
+          build:
+            context: .
+            dockerfile: .docker/nginx.dockerfile
+          links:
+            -node1:node1
+            -node2:node2
+            -node3:node3
+          ports:
+            - "80:80"
+            - "443:443"
+          env_file:
+            - ./.docker/env/app.${APP_ENV}.env
+          networks:
+            - app-network
+
+        node1:
+          container_name: node-app-1
+          build:
+            context: .
+            dockerfile: .docker/node.dockerfile
+          ports:
+            - "8080"
+          volumes:
+            - .:/var/www/app
+          working_dir: /var/www/app
+          env_file:
+            - ./.docker/env/app.${APP_ENV}.env
+          networks:
+            - app-network
+        node2:
+          container_name: node-app-2
+          build:
+            context: .
+            dockerfile: .docker/node.dockerfile
+          ports:
+            - "8080"
+          volumes:
+            - .:/var/www/app
+          working_dir: /var/www/app
+          env_file:
+            - ./.docker/env/app.${APP_ENV}.env
+          networks:
+            - app-network
+        node3:
+          container_name: node-app-3
+          build:
+            context: .
+            dockerfile: .docker/node.dockerfile
+          ports:
+            - "8080"
+          volumes:
+            - .:/var/www/app
+          working_dir: /var/www/app
+          env_file:
+            - ./.docker/env/app.${APP_ENV}.env
+          networks:
+            - app-network
+
+        mongo:
+          container_name: mongo
+          build:
+            context: .
+            dockerfile: mongo.dockerfile
+          ports:
+            - "27017:27017"
+          env_file:
+            - ./.docker/env/mongo.${APP_ENV}.env
+            - ./.docker/env/app.${APP_ENV}.env
+          networks:
+            - app-network
+
+        redis:
+          container_name: redis
+          build:
+            context: .
+            dockerfile: redis.dockerfile
+          ports:
+            - "6379"
+          env_file:
+            - ./.docker/env/app.${APP_ENV}.env
+          networks:
+            - app-network
+
+      networks:
+        app-network:
+          driver: bridge
+
+  > docker exec node1 node seed.js
+
+--------------------------------------------------------------------------------------------------
+> MOVING TO KUBERNETES - Basics
+--------------------------------------------------------------------------------------------------
+  > What Kubernetes can offer more:
+    - Package up an app, provide a manifest, and let something else manage it for us
+    - Not worry about management of containers
+    - Eliminate single points of failure and self-heal containers
+    - Have a robust way to scale and load balance containers
+    - Update containers without bringing down the application
+    - Have robust networking and persistent storage options
+  > Kubernetes
+    - kubernetes.io
+    - Kubernetes is an open-source system for automating deployment, scaling and management of containerized applications
+    - Container and cluster management
+    - Supported by all major cloud platforms
+    - Provides a declarative way to define a clusters state using manifest files (YAML)
+    - Interact with Kubernetes using `kubectl`
+  > Key Features
+    - Service Discovery/Locad Balancing
+    - Storage Orchestration
+    - Automate Rollouts/Rollbacks
+    - Manage Workloads
+    - Self-Healing
+    - Secret and Configuration Management
+    - Horizontal Scaling
+    - ...
+  > Migrating from Docker Compose to Kubernetes
+    - Compose on Kubernetes (github.com/docker/compose-on-kubernetes) - Part of Docker Desktop now
+      : This basically runs the swarm commands but with kubernetes as the orchestrtor
+    - Kompose (kompose.io)
+
+    -----------------
+  > Basic Commands
+    -----------------
+    - kubectl version
+    - kubectl get [deployments | services | pods]
+    - kubectl run nginx-server --image=nginx:alpine
+    - kubectl apply -f [fileName | folderName]
+    - kubectl port-forward [name-of-pod] 8080:80
+    - kubectl delete -f [fileName | folderName]
+
+--------------------------------------------------------------------------------------------------
+> :2 WORKING WITH SECRETS
+--------------------------------------------------------------------------------------------------
+  > Docker Secrets - String : <500K
+  > Requires Swarm Mode
+
+-- SWARM CONCEPTS SKIPPED FROM DOCKER DEEP DIVE --
