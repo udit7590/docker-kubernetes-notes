@@ -1,0 +1,296 @@
+Pluralsight: "Handling Data and Stateful Applications in Docker"
+Author: "Elton Stoneman"
+
+Uses Swarm for demos
+
+--------------------------------------------------------------------------------------------------
+> UNDERSTANDING STORAGE
+--------------------------------------------------------------------------------------------------
+  > Image Layers
+    - Image actually consist of Image layers
+    - Image layers are read only and shared between images and containers
+    - Each image layer has a SHA256 that uniquely identify the image
+  > Container Filesystem : Writeable layer
+    - Each container has a virtual Filesystem which stores both containers files and image files
+    - Each container also has a writeable layer which stores the individual container's files and is not shared
+      : Copy On Write - Eg. If a container modifies the index.html file from nginx layer, docker actually copies the file from nginx
+        image layer to the container's writeable layer and stores an updated version of the index.html file
+    - Docker combines all the image layers together and files in higher level hides the files in lower layers
+      : When you inspect the container, you can see the layers in "GraphDriver"
+        docker container inspect <id>
+        - UpperDir - This is the writeable layer
+        - MergedDir
+        - LowerDir
+        - WorkDir
+  > Volumes
+    - A container can have 0 or more volumes
+    - You can use --volume or --mount command to create volumes. --mount is the new way
+    - docker container run -it --mount type-volume,source=/usr/data,target=/container/usr/data --user admin myimage/node:1809
+    - docker container run -it --mount type-volume,source=/usr/data,target=/container/usr/data,ro --user admin myimage/node:1809 # Creates readonly volume
+
+  > Basic commands
+    docker container run -d -P <image>
+    docker container exec -it <container_id> <command>
+    docker container exec -it afd bash
+
+--------------------------------------------------------------------------------------------------
+> DEPLOYING STATEFUL APPLICATIONS FOR HIGH AVAILABILITY WITH DOCKER VOLUME
+--------------------------------------------------------------------------------------------------
+  > Stateful apps with local volumes
+    - We can define the volumes in docker-compose file and docker will create them as required on different nodes
+      : It creates them if that node is about to create a container on that volume
+    - Each volume is local to the node. So if we have 2 containers on different nodes, the volumes for them are different
+      : Data is not replicated across nodes
+    = 2 containers on the same node will share the volume though
+
+  > Stateful Apps : Replicated Storage
+    - Example - Postgres master slave
+
+      # docker-compose.yml
+      version: '3.7'
+      services:
+        db-master:
+          image: psodstorage/store-db # This image has the logic to run the postgres either as a master or as a slave
+          environment:
+            POSTGRES_USER: 'postgres'
+            POSTGRES_PASSWORD: 'postgres'
+            PGDATA: '/var/lib/postgresql/data/pgdata'
+          volumes:
+            - postgres-master:/var/lib/postgresql/data
+          networks:
+            - store-net
+        db-slave:
+          image: psodstorage/store-db
+          environment:
+            POSTGRES_USER: 'postgres'
+            POSTGRES_PASSWORD: 'postgres'
+            PGDATA: '/var/lib/postgresql/data/pgdata'
+            REPLICATED_FROM: 'db-master'
+          volumes:
+            - postgres-slave:/var/lib/postgresql/data
+          networks:
+            - store-net
+        api:
+          image: psodstorage/store-api
+          environment:
+            - "ConnectionStrings:StoreContext=Host=db-master;Database=store;"
+          ports:
+            -'8085:80'
+          networks:
+            - store-net
+          deploy:
+            replicas: 1
+        web:
+          image: psodstorage/store-web
+          environment:
+            - "ConnectionStrings:StoreContext=Host=db-master;Database=store;"
+          ports:
+            -'8081:80'
+          networks:
+            - store-net
+      networks:
+        store-net:
+      volumes:
+        postgres-master:
+        postgres-slave:
+
+      # Overrides
+      # docker-compose-build.yml
+      version: '3.7'
+      services:
+        db-master:
+          build: ./database
+        db-slave:
+          build: ./database
+        api:
+          build:
+            context: .
+            dockerfile: ./docker/api/Dockerfile
+        web:
+          build:
+            context: .
+            dockerfile: ./docker/web/Dockerfile
+
+      # Overrides
+      # docker-compose-prod.yml
+      version: '3.7'
+      services:
+        db-master:
+          deploy:
+            replicas: 1
+            placement:
+              constraints:
+                - node.labels.postgres==master # This ensures master always runs on the same node where label is configures as master
+        db-slave:
+          deploy:
+            node: global # Will run on all the nodes in the swarm (that matches the constraints)
+            placement:
+              constraints:
+                - node.labels.postgres==slave
+        api:
+          deploy:
+            replicas: 2
+        web:
+          deploy:
+            replicas: 8
+
+      # Commands to deploy
+      # 1 Join the overrides docker compose files
+        docker-compose -f ./docker-compose.yml -f ./docker-compose-prod.yml config > stack.yml # Combines the docker-compose, validates and stores them in stack.yml
+      # 2 List nodes
+        docker node ls
+      # 3 Add labels
+        docker node update --label-add postgres=master <node1_name>
+        docker node update --label-add postgres=slave <node2_name>
+        docker node update --label-add postgres=slave <node3_name>
+      # 4 Docker swarm deploy
+        docker stack deploy -c ./stack.yml store
+
+    - Using labels for slaves is a good idea since we wont have to specify individual slave labels in the docker file.
+      We just use one slave label and since it is automatically loaded on multiple nodes using label constraints, out app can now talk to multiple slaves dynamically.
+      If we start a new node with a slave label, our app will also start talking to it.
+
+    > Failover and Scale for replicated apps
+      - Scaling out postgres slaves
+        -> Just add a new node with the label "postgres=slave"
+          docker node update --label-add postgres=slave node4
+      - Slave container and server failure
+        -> As soon as the node/container is back online, it will join the cluster
+      - Postgres master failover
+        -> If a master fails, there will be a downtime and we will have to wait for it to back online
+        -> There are ways to tackle this - eg. promote slave to the master or running multiple masters if the underlying tool allows it
+
+--------------------------------------------------------------------------------------------------
+> USING VOLUME PLUGINS FOR SCALING DYNAMIC STATEFUL APPLICATIONS
+--------------------------------------------------------------------------------------------------
+  > You can find Volume Plugins on docker hub
+    - Filter by Plugins -> Volumes
+    : eg. cloudstor -> conects to different volumes from cloud providers
+
+  > Stateful apps with shared storage
+    - Multiple containers share one volume
+    - cloudstor plugin for Azure
+
+    - docker plugin inspect cloudstor:azure
+      - check the Env key
+    - Example:
+      # docker-compose.yml
+      version: '3.7'
+      services:
+        web:
+          image: 'psodstorage/api-customer'
+          ports:
+            - '8080:80'
+          volumes:
+            - "api-customer-cache:/api-cache"
+          networks:
+            - api-customer-net
+      volumes:
+        api-customer-cache: # This is a local volume
+      networks:
+        api-customer-net:
+
+      # docker-compose-prod.yml
+      version: '3.7'
+      services:
+        web:
+          deploy:
+            mode: global
+      volumes:
+        api-customer-cache:
+          name: cs-api-customer-cache
+          driver: 'cloudstor:azure'
+          driver_opts:
+            share: 'api-customer-cache'
+
+    - So now our master can also be configured as a failover. We can remove the label constraint for master
+      so master can run on any nodes. Use the network volume from Azure for master. 
+      Now if master fails on one node, another master container can start on another node and will point to the same volume and will be back immediately
+      Slaves can continue to run on local volumes since we already have a good failover for slaves
+
+      Exmaple:
+        Remove the label constraints from the main example
+        This is how the volumes will change
+
+        volumes:
+          postgres-slave:
+          postgres-master:
+            driver: 'cloudstor:azure'
+            driver_opts:
+              gid: '999'
+              uid: '999'
+
+        But this setup will fail because postgres is not compatible with the Azure file system. So it seems we cannot add a failover with postgres master using this.
+
+  > High Failover using Cockroach DB -> Allows read/write on all nodes
+--------------------------------------------------------------------------------------------------
+> MANAGING STORAGE ON DOCKER SERVERS AND REGISTRIES
+--------------------------------------------------------------------------------------------------
+  > Local Storage Accumulation
+    - As you keep building new containers, images and nodes, all the image layer data, build cache etc keeps on building up and docker does not remove them automatically
+
+    - Demo: Where docker all the data like image layers, build cache and writeable cache layer
+
+    docker system df # Overall view of the system. Shows Local volumes, Images, Containers and build cache
+    docker system df --verbose
+    docker system info # more info like storage driver, root director where data is stored in docker
+
+  > Optimizing your Docker Images
+    Maximum use of the layer cache
+    Core set of base images
+    Logically structured Dockerfiles
+
+    - Base Images
+      - The base images should be same as much as possible for each service - eg. same OS for each of nginx, redis, app, etc.
+        If the base image is same, all of them can be shared and all the updates to 1 base image will be propogated to other services - easy to maintain
+      - Each time you upgrade your base image, you will have the new version of the base image and older ones can still remain on your docker for a while
+  > Optimizing Dockerfiles with Multi-Stage Builds
+    - Multi-Stage builds will build one final image while all the intermediate builds can be used to build packages and files required for the app
+    - docker image history <image-name>
+    - Example: 
+      ## Single Stage:
+      FROM java:openjdk-8-jdk-alpine
+      RUN MAVEN_VERSION=3.3.3 \
+          && cd /usr/share \
+          && wget "path_to_maven"
+          && mv /usr/share/apache-maven-$MAVEN_VERSION /usr/bin/mvn
+
+      WORKDIR /code
+      ADD . .
+      RUN ["mvn", "dependency:resolve", "verify", "package"]
+
+      EXPOSE 8080
+      CMD ["java", "-jar", "/worked.jar"]
+
+      - This image has several issues:
+        : The final image will have maven and the OS and hence the image size will be huge
+        : If we change any file in the code, we compile the maven repositories again due to cache burst and hence building and compiling app after every code takes too much time
+
+      ## Multi Stage:
+      FROM maven:3.5-jdk-8-alpine AS build
+      WORKDIR /code
+      COPY pom.xml /code/pom.xml
+      RUN ["mvn", "dependency:resolve", "verify"]
+      COPY ["src/main", "code/src/main"]
+      RUN ["mvn", "package"]
+
+      # App Image
+      FROM openjdk:8-jre-alpine
+      EXPOSE 8080
+      CMD ["java", "-jar", "/worked.jar"]
+      COPY --from=build /code/target/worker.jar / # copies jar from the first stage build
+
+      - Now the problems are solved
+        : Our final image is free from OS and maven
+        : If we chance the code, we will have the ,aven files from the first build and that will not need any build again
+
+  > Cleaning up Docker environment
+    - Docker does not clean images that are not being used and hence you will have many dangling images eventually which does not do anything
+
+    - Basic Commands
+      docker image prune --help
+      docker volume prune --help
+      docker system prune --help # combined command for image and volumes pruning. Will also clear networks and other dangling objects
+
+  > Understanding Docker Registries
+
