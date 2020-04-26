@@ -1,0 +1,739 @@
+Pluralsight: "Kubernetes for Developers - Core Concepts"
+Author: "Dan Wahlin"
+
+https://github.com/kubernetes/examples
+https://github.com/DanWahlin/DockerAndKubernetesCourseCode
+
+--------------------------------------------------------------------------------------------------
+> KUBERNETES DEVELOPER PERSPECTIVE
+--------------------------------------------------------------------------------------------------
+  > kubernetes.io
+  > Kubernetes (K8s) is an open-source system for automating deployment, scaling and management of containerized applications
+  > Key Features
+    - Service Discovery/Load Balancing
+    - Storage Orchestration
+    - Automate Rollbacks/Rollouts
+    - Self-healing
+    - Secret and Configuration Management
+    - Horizontal Scaling
+  > History
+    - Google had this project for their container and cluster management and they had it in house for 15 years
+    - Open sourced it to the Cloud Native Computing Platform
+    - Provides a declarative way to define a cluster;s state
+  > Basic Architecture
+    - Master Nodes architecture to form a cluster
+    - Pods : A package for containers
+    - Services
+    - Deployments
+  > Key Container Benefits
+    - Accelerate Developer Onboarding
+    - Eliminate App Conflicts
+    - Environment Consistency
+    - Ship software faster
+  > Key K8s Benefits
+    - Orchestrate containers
+    - Zero-downtime deployments
+    - Self healing
+    - Scale containers
+  > Developer Use Cases
+    - Emulate production locally
+    - Move from Docker Compose to Kubernetes
+    - Create an end-to-end testing environment
+    - Ensure application scales properly
+    - Ensure secrets/config are working properly
+    - Performance testing scenarios
+    - Workload scenarios (CI/CD and more)
+    - Learn how to leverage deployment options
+    - Help Devops create resources and solve problems
+  > Running Kubernetes Locally
+    - Minikube - github.com/kubernetes/minikube
+    - Docker Desktop (limitation of one master and one node)
+  > Installing and Running Kubernetes
+    - kind : https://kind.sigs.k8s.io
+    - kubeadm (install full kubernetes)
+    ----------------------------------------
+  > Basic kubectl commands
+    ----------------------------------------
+    - Help
+      kubectl
+    - kubectl version
+    - kubectl cluster-info
+    - Retrieve info about Kubernetes Pods, Deployments, Services and more
+      kubectl get all
+    - Simple way to create a Deployment for a pod
+      kubectl run [container-name] --image=[image-name]
+    - Forward a port to allow external access
+      kubectl port-forward [pod] [ports]
+    - kubectl expose ...
+    - kubectl create [resource]
+    - kubectl apply [resource] # Create or update a resource
+  > Web UI Dashboard
+    - https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard
+    - kubectl apply [dashboard-yaml-url]
+    - kubectl describe secret -n kube-system
+    - Locate the kubernetes.io/service-account-token and copy the token
+    - kubectl proxy
+    - Visit the dashboard url and login using the token
+
+--------------------------------------------------------------------------------------------------
+> CREATING PODS
+--------------------------------------------------------------------------------------------------
+  > Smallest object of the kubernetes object model
+  > Environment for containers
+  > Organize application "parts" into pods (server, caching, APIs, database, etc)
+  > Pod IP, memory, volumes etc shared across containers
+  > Scale horizontally by adding pod replicas
+  > Pods live and die but never come back to life
+  > IPs and Ports
+    > Pod containers share the same Network namespace (share IP/port)
+    > Pod containers have the same loopback Network interface (localhost)
+    > Container processes need to bind to different ports within a pod
+    > Ports can be reused by containers in separate pods
+  > Pods DO NOT span multiple nodes
+
+  > Creating a pod (2 ways)
+    - kubectl run [podname] --image=nginx:alpine
+    - Using yaml file
+
+  > Exposing a Pod Port
+    - Pods and containers are only accessible within the Kubernetes cluster by default
+    - One way to expose a container port externally: kubectl port-forward
+    kubectl port-forward [name-of-pod] 8080:80 # external-port:internal-port
+
+  > Deleting a pod
+    - kubectl delete pod [name-of-pod]
+    OR delete the deployment
+    - If you delete a pod, it will be recreated
+    - If you dont want pod to come back, you have to delete the deployment
+      kubectl delete deployment [name-of-deployment]
+
+    ----------------------------------------
+  > Basic Commands
+    ----------------------------------------
+    - kubectl get all
+    - kubectl run my-nginx --image=nginx:alpine
+      # Creates a pod, deployment and replica-set
+    - kubectl delete pod my-nginx-234212nsa2
+      # Will spin up a new pod after deletion
+    - kubectl get pods
+    - kubectl port-forward my-nginx-234212nsa2 8080:80
+    - kubectl delete deployment my-nginx
+    - kubectl get pods --watch # Watch the states live for pods
+
+  > YAML Way
+    # nginx.pod.yml
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: my-nginx
+      labels:
+        app: nginx
+        rel: stable
+    spec:
+      containers:
+      - name: my-nginx
+        iamge: nginx:alpine
+        - containerPort: 80
+
+    # Create a trial run and also validate yml
+    - kubectl create -f file.pod.yml --dry-run --validate-true
+    - kubectl create -f file.pod.yml # Will error if pod exists
+    - kubectl apply -f file.pod.yml
+    - kubectl apply -f file.pod.yml --save-config # Stores current properties in resource's annotations
+      # Having --save-config allows in-place changes to be made to a pod in the future using kubectl apply
+    - In place/non-disruptive changes can also be made to a Pod using kubectl using kubectl edit or kubectl patch
+
+    - kubectl delete -f file.pod.yml
+
+    - kubectl get pod my-nginx -o yaml # or json
+    - kubectl describe pod my-nginx
+      # gives info like which node is it on, events or log information, etc
+
+    - Get inside the pod
+      kubectl exec my-nginx -it sh
+
+  > Pod Health
+    - A probe is a diagnostic performed periodically by the kubelet on a container
+    - Failed Pod containers are recreated by default (restartPolicy defaults to always)
+    - Types of probes
+      : Liveness probes can be used to determine if a Pod is healthy and running as expected. It is used to say if a container should be restarted
+      : Readiness probes can be used to determine if a Pod should receive requests
+
+      - ExecConnection - Executes an action inside the container
+      - TCPSocketAction - TCP check against the containers ip address on a specified port
+      - HTTPGetAction - HTTP GET request against container
+
+      : Probes can have following results: Success, Failure, Unknown
+
+      : If a probe fails, `kubectl get pods podname` will still show running but `kubectl describe podname` will show under events that container is being restarted
+
+      - Example:
+        ...
+        spec:
+          containers:
+          - name: my-nginx
+            image: nginx:alpine
+            livenessProbe:
+              httpGet:
+                path: /index.html
+                port: 80
+              initialDelaySeconds: 15
+              timeoutSeconds: 2
+              periodSeconds: 5
+              failureThreshold: 1
+            readinessProbe:
+              httpGet:
+                path: /index.html
+              initialDelaySeconds: 2
+              periodSeconds: 5
+
+        - Example 2:
+          ...
+          spec:
+            containers:
+            - name: liveness
+              image: k8s.gcr.io:busybox
+
+              args:
+              - /bin/sh
+              - -c
+              - touch /tmp/healthy; sleep 30; rm -rf /tmp/healthy; sleep 600 # Create a health file and delete it later so that probe fails
+
+              livenessProbe:
+                exec:
+                  command:
+                    - cat
+                    - tmp/healthy
+                  initialDelaySeconds: 5
+                  periodSeconds: 5
+
+
+--------------------------------------------------------------------------------------------------
+> CREATING DEPLOYMENTS
+--------------------------------------------------------------------------------------------------
+  > A ReplicaSet is a declarative way to manage Pods
+  > A Deployment is a declarative way to manage Pods using a ReplicaSet
+  > Used to ensure Pods keep running and can be used to scale Pods
+  > ReplicaSets
+    - Acts as a Pod controller
+    - self-healing mechanism
+    - ensure the requested number of pods are available
+    - provide fault-tolerance
+    - can be used to scale pods
+    - relies on a pod template
+    - no need to create pods directly
+    - used by deployments
+  > Deployment
+    - Pods are managed using ReplicaSets
+    - Scales ReplicaSets, which scales pods
+    - Supports zero-downtime updates by creating and destroying ReplicaSets
+    - Provides Rollback functionality
+    - Creates a unique label that is assigned to ReplicaSet and generated Pods
+    - YAML is similar to ReplicaSet
+
+  > Creating a Deployment
+    - Example:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: frontend
+        labels:
+          app: my-nginx
+          tier: frontend
+      spec:
+        replicas: 4
+        selector:
+          matchLabels:
+            tier: frontend
+        template: # Essentially a pod yaml. Can be in a separate file as well
+          metadata:
+            labels:
+              tier: frontend
+          spec:
+            containers:
+            - name: my-nginx
+              image: nginx:alpine
+              ports:
+              - containerPort: 80
+              resources: # What resources will be available to the Pod
+                limits:
+                  memory: "128Mi"
+                  cpu: "200m" # 200 milli cpu (or .2cpu or 20% of CPU)
+
+    ----------------------------------------
+  > Basic Commands
+    ----------------------------------------
+    - kubectl create -f file.deployment.yml --save-config
+    - kubectl apply -f file.deployment.yml
+    - kubectl get deployments
+    - kubectl get deployment  --show-labels # For specific label use `-l` option
+      kubectl get deployment -l app=nginx
+    - kubectl delete deployment [deplyment-name]
+      kubectl delete -f file.deployment.yml
+    - kubectl scale deployment [deployment-name] --replicas=5
+      kubectl scale -f file.deployment.yml --replicas=5
+    - kubectl describe deployment my-nginx
+    - kubectl get deploy # deploy | deployment | deployments are aliases
+
+  > Deployment Options
+    - Zero-downtime deployments
+    - Update an application;s pods without impacting end users
+    - Rolling Updates
+    - Blue-green deployments
+      : Multiple environments running exactly at the same time. When you are sure new environment is good, switch to the new environment
+    - Canary deployments
+      : Small amount of traffic goes to the new environment and when you are confident, all the traffic moves to new deployment
+    - Rollbacks
+      : Goes back to previous version
+
+    - Example:
+      For rolling updates, use different labels like app=v1 app=v2 app=v3 and apply the deployment file using `kubectl apply`
+      Kubernetes will automatically keep the old containers running till the new ones are up and running
+
+--------------------------------------------------------------------------------------------------
+> CREATING SERVICES - Mainly for networking - only basics
+--------------------------------------------------------------------------------------------------
+  > A Service provides a single point of entry for accessing one or more Pods
+  > Since Pods live and die (they are mortal), we cannot rely on their IP Addresses
+  > Pods can also scale so each Pod gets its own IP address
+  > A Pod gets an IP address after it has been scheduled (no way for clients to know IP ahead of time)
+  > Services abstract Pod IP addresses from consumers
+  > Relies on labels to associate a Service with a Pod
+  > Node;s kube-proxy creates a virtual IP for Services
+  > Layer 4 (TCP/UDP over IP)
+  > Services are not ephemeral or short-lived
+  > Creates Endpoints which sit between a Service and a Pod
+
+  > Service Types
+    : ClusterIP - expose the service on a cluster-internal IP (default)
+    : NodePort - Expose the service on each Node;s IP at a static port
+    : LoadBalancer - Provision an external IP to act as a load balancer for the service
+    : ExternalName - Maps a service to the DNS name
+
+  > ClusterIP Service
+    - Only Pods within the cluster can talk to the Service
+    - Pods can talk to other pods
+
+  > NodePort Service
+    - Expose the service on each Node;s IP at a static port
+    - Allocates a port from the range (30000 - 32767)
+    - Each Node proxies the allocated port
+
+  > LoadBalancer Service
+    - Exposes a service externally
+    - Useful when combined with a cloud provider;s load balancer
+    - Behind the scenes NodePort and ClusterIP Services will be created
+    - Each Node proxies the allocated port
+
+  > ExternalName Service
+    - Service that acts as an alias for an external service
+    - Allows a service to act as a proxy for an external service
+    - external service details are hidden from the cluster (easier to change)
+
+    ----------------------------------------
+  > Basic Commands
+    ----------------------------------------
+    - kubectl port-forward deployment/[deployment-name] 8080
+    - kubectl port-forward serice/[serice-name] 8080 # Listen to port 8080 internally and forward the request to service's pod
+
+    - kubectl create -f file.service.yml --save-config
+      kubectl create service service-name
+      OR
+      kubectl apply -f file.service.yml
+      kubectl apply service service-name
+    - kubectl delete -f file.service.yml
+      kubectl delete service service-name
+
+  > Example ClusterIP
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: my-nginx # whatever name you give a service gets a DNS entry within the cluster;s DNS
+      labels:
+        app: nginx
+    spec:
+      selector:
+        app: nginx
+      ports:
+      - name: http
+        port: 80
+        targetPort: 80
+
+  > Example NodePort
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: my-nginx # whatever name you give a service gets a DNS entry within the cluster;s DNS
+      labels:
+        app: nginx
+    spec:
+      type: NodePort
+      selector:
+        app: nginx
+      ports:
+      - port: 80
+        targetPort: 80
+        nodePort: 31000 # Optional as it is automatically set
+
+  > Example LoadBalancer
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: my-nginx # whatever name you give a service gets a DNS entry within the cluster;s DNS
+      labels:
+        app: nginx
+    spec:
+      type: LoadBalancer
+      selector:
+        app: nginx
+      ports:
+      - port: 80
+        targetPort: 80
+
+
+--------------------------------------------------------------------------------------------------
+> UNDERSTANDING STORAGE OPTIONS
+--------------------------------------------------------------------------------------------------
+  > Pods live and die so their file system is short-lived
+  > Volumes can be used to store state/data and use it in a Pod
+  > A Pod can have multiple volumes attached to it
+  > Containers rely on a mountPath to access a Volume
+  > Kubernetes Supports:
+    - Volumes
+    - PersistentVolumes
+    - PersistentVolumeClaims
+    - StorageClasses
+
+  > Volumes
+    - A Volume references a storage location
+    - Must have a unique name
+    - Attached to a Pod and may or may not be tied to the Pod;s lifetime (depending on volume;s type)
+    - A Volume Mount references a volume by name and defines a mountPath
+    - Volumes Type Examples
+      : emptyDir - Empty directory for storing "transient" data (shares a Pod;s lifetime) useful for sharing files between containers running in a Pod
+      : hostPath - Pod mounts into the node;s filesystem
+        Types could be DirectoryOrCreate, Directory, FileOrCreate, File, Socket, CharDevice, BlockDevice and more
+      : nfs - An NFS (Network File System) share mounted in a Pod
+      : configMap / Secret - Special types of volumes that provide a Pod with access to Kubernetes resources
+      : persistentVolumeClaims - Provide Pods with a more persistent storage option  that is abstracted from the details
+      : Cloud - Cluster-wide storage
+        : AWS: Elastic Block Store
+        : Azure: Azure Disk and Azure File
+        : GCP: GCE Persistent Disk
+
+    - EmptyDir Example: - stays till we have the pod
+      apiVersion: v1
+      kind: Pod
+      spec:
+        volumes:
+        - name: html
+          emptyDir: {}
+        containers:
+        - name: nginx
+          image: nginx:alpine
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+        - name: html-updater
+          image: alpine
+          command: ["/bin/sh", "-e"]
+          args:
+            - while true; do date >> /html/index.html; sleep 10; done
+          volumeMounts:
+            - name: html
+              mountPath: /html
+
+    - hostPath Volume Example: # If the node goes down, you lose the data
+      apiVersion: v1
+      kind: Pod
+      spec:
+        volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+        containers:
+        - name: docker
+          image: docker
+          command: ["sleep"]
+          args: ["10000"]
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+
+    - cloud Volume Example: # If the node goes down, you lose the data
+      apiVersion: v1
+      kind: Pod
+      spec:
+        volumes:
+        - name: aws-vol
+          awsElasticBlockStore:
+            volumeID: <volume-id>
+            fsType: ext4
+        containers:
+        - name: docker
+          image: docker
+          command: ["sleep"]
+          args: ["10000"]
+          volumeMounts:
+            - name: aws-vol
+              mountPath: /data/storage
+
+    ----------------------------------------
+  > Basic Commands
+    ----------------------------------------
+    - kubectl describe pod [pod-name]
+      # Will show Volumes for pod as well
+    - kubectl get pod [pod-name] -o yaml
+    - kubectl get pv
+
+  > PersistentVolumes and PersistentVolumeClaims
+    - A PersistentVolume (PV) is a cluster wide storage unit provisioned by an administrator with a lifecycle independent from a Pod
+    - A PersistentVolumeClaim (PVC) is a request for a storage unit (PV)
+    - Relies on network-attached storage (NAS)
+    - Available to a Pod even if it gets rescheduled to a different Node
+    - Rely on a storage provider such as NFS, cloud storage, or other options
+    - Associated with a Pod by using a PVC
+
+    - Workflow
+      1. Create network storage resource (NFS, Cloud, etc)
+      2. Define a PV and send to Kubernetes API
+      3. Create a PVC
+      4. Kubernetes binds the PVC to PV
+      5. Pod references to the PVC
+
+  > StorageClasses (SC)
+    - SC is a type of storage template that can be used to dynamically provision storage
+    - Used to define different "classes" of storage
+    - Acts as a type of storage template
+    - Supports dynamic provisioning of PersistentVolumes
+
+    # Explore examples for PV, PVC, SC on https://github.com/kubernetes/examples -> volumes
+
+    - A simple example for MongoDB:
+      # PV
+      apiVersion: v1
+      kind: PersistentVolume
+      metadata:
+        name: mongo-pv
+      spec:
+        capacity:
+          storage: 1Gi
+        volumeMode: Filesysystem
+        accessModes:
+        - ReadWriteOnce
+        storageClassName: local-storage
+        local:
+          path: /tmp/data/db
+        nodeAffinity: # Specifies which node the storage stick to
+          required:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                value:
+                - docker-desktop
+
+      # PVC
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: mongo-pvc
+      spec:
+        accessModes:
+          -ReadWriteOnce
+        storageClassName: local-storage
+        resources:
+          requests:
+            storage: 1Gi
+
+      # Service
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: mongo
+      spec:
+        selector:
+          app: mongo
+        ports:
+        - port: 27017
+          targetPort: 27017
+
+      # Deployment
+      apiVersion: apps/v1
+      kind: StatefulSet # Manages the deployment and scaling of a set of Pods, and provides gurantees about the ordering and uniqueness of these Pods
+      metadata:
+        labels:
+          app: mongo
+        name: mongo
+      spec:
+        serviceName: mongo
+        replicas: 1
+        selector:
+          matchLabels:
+            app: mongo
+        template:
+          metadata:
+            labels:
+              app: mongo
+          spec:
+            containers:
+              - image: mongo
+                name: mongo
+                ports:
+                - containerPort: 27017
+                command:
+                - mongod
+                - "--auth"
+                resources: {}
+                volumeMounts:
+                - name: mongo-volume
+                  mountPath: /data/db
+            volumes:
+            - name: mongo-volume
+              persistentVolumeClaim:
+                claimName: mongo-pvc # This is how we use PVC for a Pod
+
+--------------------------------------------------------------------------------------------------
+> CREATING ConfigfMaps AND SECRETS
+--------------------------------------------------------------------------------------------------
+  > ConfigfMaps provide a way to store configuration information and provide it to containers
+  > Can store entire files or provide key/value pairs:
+    - Store in a File. Key is the filename, value is the file contents (can be json, xml, key/values, etc)
+    - Provide on the command line
+    - ConfigfMap manifest
+  > Accessing ConfigMap Data in a Pod
+    - Using Environment Variables
+    - ConfigMap Volume (access as files)
+
+  - Example:
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: app-settings
+      labels:
+        app: app-settings
+    data:
+      enemies: aliens
+      lives: "3"
+      enemies.cheat: "true"
+
+    ----------------------------------------
+  > Basic Commands
+    ----------------------------------------
+    - kubectl create -f file.configmap.yml
+    - kubectl create configmap [cm-name] --from-file=[path-to-file] # In case of files, filename becomes the key and it's value is the contents of the file
+    - game-config.env eg. enemies=aliens
+      kubectl create configmap [cm-name] --from-env-file=[path-to-file] # Here filename is not the key. Contents of .env are the key-value pairs
+    - kubectl create configmap [cm-name] --from-literal=apiUrl=https://my-api # Directly load key value pairs
+
+    - kubectl get cm [cm-name] -o yaml
+      kubectl get configmap [cm-name] -o yaml
+  
+  > Using Values from ConfigMap
+    ...
+    containers: ...
+      env:
+      - name: ENEMIES
+        valueFrom:
+          configMapKeyRef:
+            key: app-settings # Name of the ConfigMap
+            name: enemies # Key name
+
+    OR
+    containers: ...
+      envFrom:
+      - configMapRef:
+        name: app-settings
+
+  > Accessing a ConfigMap through Volume
+    # Each key is converted to a file and value is added into the file
+    spec: ...
+      volumes:
+        - name: app-config-vol
+          configMap:
+            name: app-settings
+      containers: ...
+        volumeMounts:
+          - name: app-config-vol
+            mountPath: /etc/config
+
+  > Secrets
+    - A Secret is an object that contains a small amout of sensitive data such as a password, a token or a key
+    - A sensitive store to store these secrets
+    - Avoids storing secrets in container images, in files, or in deployment manifests
+    - Mount secrets into Pods as files or as environment variables
+    - Kubernetes only makes secrets available to Nodes that have a Pod requesting the secret
+    - Secrets are stored in tmpfs on a Node (not on disk)
+    - Best Practices:
+      : Enable encryption at rest for cluster data (https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data)
+      : Limit access to etcd (where secrets are stored) to only admin users
+      : Use SSL/TLS for etcd peer-to-peer communication
+      : Manifest (YAML/JSON) files only base64 encode the Secret
+      : Pods can access Secrets so secure which users can create Pods. Role-based access control (RBAC) can be used
+
+      ----------------------------------------
+    > Basic Commands
+      ----------------------------------------
+      - kubectl create secret generic my-secret --from-literal=pwd=my-password
+      - kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa
+        kubectl create secret generic my-secret --from-file=ssh-oublickey=~/.ssh/id_rsa.pub
+      - kubectl create secret tls tls-secret --cert=/path/to/tls.cert --key=/path/to/tls.key
+      - kubectl get secrets
+        kubectl get secrets db-passwords -o yaml
+    
+    - You can also define secrets in YAML but the values have to be base64 encoded. But might not be secure
+
+    - Example:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: db-passwords
+      type: Opaque
+      data:
+        app-password: <base64 encode password>
+        db-password: <base64 encode password>
+
+    - Using Values from Secret
+      ...
+      containers: ...
+        env:
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: db-passwords # Name of the ConfigMap
+              name: db-password # Key name
+
+    - Using Volumes to load secrets
+      spec: ...
+        volumes:
+          - name: secrets
+            secret:
+              secretName: db-passwords
+        containers: ...
+          volumeMounts:
+            - name: secrets
+              mountPath: /etc/db-passwords
+              readOnly: true
+
+--------------------------------------------------------------------------------------------------
+> PUTTING IT ALL TOGETHER - DEMO
+--------------------------------------------------------------------------------------------------
+  > https://github.com/DanWahlin/CodeWithDanDockerServices
+
+  > kubectl apply -f .k8s # Iterates recursively to the directory and applies all the files
+
+  > Troubleshooting
+    - kubectl logs [pod-name]
+    - kubectl logs [pod-name] -c [container-name]
+    - kubectl logs -p [pod-name] # View the logs for a previously managed Pod
+    - kubectl logs -f [pod-name] # Stream logs
+
+    - kubectl describe pod [pod-name]
+      kubectl get pod [pod-name] -o yaml
+      kubectl get deployment [deployment-name] -o yaml
+
+    - kubectl exec [pod-name] -it sh # or bash
+
+
